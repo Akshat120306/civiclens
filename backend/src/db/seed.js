@@ -329,17 +329,18 @@ async function seed() {
   }
 
   console.log('CivicLens database seed completed successfully!');
-  console.log('Seed Summary:');
-  console.log('- 5 Departments');
-  console.log('- 5 Pre-configured Users (Citizen, 3 Officers, Admin)');
-  console.log('- Issue #1042: Resolved Road Damage near ABC College with 12 complaints, PWD assignment, actions, evidence, and verified audit');
-  console.log('- Issue #1043: Active Water Supply Leakage with 4 complaints');
-  console.log('- Issue #1044: Overdue Electricity Grid Failure with 3 complaints');
-  console.log('- Issue #1045: Solid Waste Overflow with 3 complaints');
-  console.log('- 2 Isolated unclustered complaints');
 }
 
-seed().catch(err => {
-  console.error('Seed script failed:', err);
-  process.exit(1);
-});
+export async function runSeed() {
+  await seed();
+}
+
+// If run directly from terminal: node seed.js
+if (process.argv[1] && process.argv[1].endsWith('seed.js')) {
+  seed().catch(err => {
+    console.error('Seed script failed:', err);
+    process.exit(1);
+  });
+}
+
+export default seed;

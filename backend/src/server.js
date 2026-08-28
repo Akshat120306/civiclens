@@ -21,7 +21,11 @@ const app = express();
 
 // Ensure uploads folder exists
 if (!fs.existsSync(config.uploadsDir)) {
-  fs.mkdirSync(config.uploadsDir, { recursive: true });
+  try {
+    fs.mkdirSync(config.uploadsDir, { recursive: true });
+  } catch (err) {
+    // Ignore in read-only serverless
+  }
 }
 
 // Middleware
@@ -32,6 +36,17 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Ensure DB is initialized for incoming requests
+app.use(async (req, res, next) => {
+  try {
+    await initDb();
+    next();
+  } catch (err) {
+    console.error('DB init middleware error:', err);
+    next(err);
+  }
+});
 
 // Serve uploaded images statically
 app.use('/uploads', express.static(config.uploadsDir));
@@ -75,20 +90,24 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start Server & Initialize Database
+// Start Server & Initialize Database (for non-serverless environments)
 async function startServer() {
   try {
     await initDb();
-    app.listen(config.port, () => {
-      console.log(`=======================================================`);
-      console.log(`CivicLens Backend API is running on http://localhost:${config.port}`);
-      console.log(`AI Engine: ${config.geminiApiKey ? 'Gemini 1.5 + Fallback' : 'Deterministic NLP Engine (Demo Mode)'}`);
-      console.log(`Database: Universal Persistent Engine`);
-      console.log(`=======================================================`);
-    });
+    if (!process.env.VERCEL) {
+      app.listen(config.port, () => {
+        console.log(`=======================================================`);
+        console.log(`CivicLens Backend API is running on http://localhost:${config.port}`);
+        console.log(`AI Engine: ${config.geminiApiKey ? 'Gemini 1.5 + Fallback' : 'Deterministic NLP Engine (Demo Mode)'}`);
+        console.log(`Database: Universal Persistent Engine`);
+        console.log(`=======================================================`);
+      });
+    }
   } catch (err) {
     console.error('Fatal: Failed to start CivicLens API server:', err);
-    process.exit(1);
+    if (!process.env.VERCEL) {
+      process.exit(1);
+    }
   }
 }
 
