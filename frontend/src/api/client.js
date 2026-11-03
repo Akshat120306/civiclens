@@ -1,12 +1,21 @@
 import axios from 'axios';
 
-// Determine API Base URL automatically
+// Determine API Base URL automatically.
+// Normalizes the result so it always ends in exactly one "/api" — this guards
+// against a misconfigured VITE_API_URL (e.g. the backend root without /api),
+// which otherwise makes the app hit the SPA fallback (HTML) instead of the API.
 const getBaseUrl = () => {
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-  if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
-    return 'https://civiclens-1mi1.onrender.com/api';
+  let base = import.meta.env.VITE_API_URL;
+  if (!base) {
+    if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+      base = 'https://civiclens-1mi1.onrender.com/api';
+    } else {
+      return '/api';
+    }
   }
-  return '/api';
+  base = base.replace(/\/+$/, '');          // drop trailing slashes
+  if (!/\/api$/i.test(base)) base += '/api'; // ensure the /api prefix
+  return base;
 };
 
 const api = axios.create({
