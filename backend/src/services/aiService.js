@@ -17,7 +17,7 @@ if (config.geminiApiKey) {
 const CATEGORY_KEYWORDS = {
   'Roads & Infrastructure': ['pothole', 'road', 'asphalt', 'crater', 'pavement', 'sidewalk', 'manhole', 'bridge', 'flyover', 'tarmac', 'ditch', 'speed breaker'],
   'Water Supply & Sanitation': ['water', 'pipe', 'pipeline', 'leakage', 'leak', 'drainage', 'sewage', 'clogged', 'contamination', 'flood', 'flooding', 'gutter'],
-  'Electricity & Lighting': ['streetlight', 'pole', 'lamp', 'wire', 'cable', 'transformer', 'blackout', 'power', 'sparks', 'electricity', 'meter', 'dark'],
+  'Electricity & Lighting': ['streetlight', 'street light', 'street-light', 'lighting', 'lights', 'pole', 'lamp', 'wire', 'cable', 'transformer', 'blackout', 'power', 'sparks', 'electricity', 'meter', 'dark'],
   'Solid Waste Management': ['garbage', 'trash', 'waste', 'dump', 'dustbin', 'litter', 'smell', 'debris', 'uncollected', 'dead animal'],
   'Traffic & Transport': ['traffic', 'signal', 'jam', 'congestion', 'lights', 'sign', 'bus stop', 'parking', 'zebra crossing'],
 };

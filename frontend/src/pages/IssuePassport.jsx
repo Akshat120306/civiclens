@@ -101,30 +101,22 @@ export default function IssuePassport() {
 
         {/* Action Controls for Demo Testing */}
         <div className="flex items-center space-x-2">
-          {/* Citizen Verification Button */}
+          {/* Citizen: confirm the repair */}
           <button
             onClick={() => setIsVerificationOpen(true)}
             className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm flex items-center space-x-1.5 transition-colors"
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Audit / Verify Resolution</span>
+            <span>Verify</span>
           </button>
 
-          {/* Department Action Controls */}
+          {/* Department: submit resolution proof */}
           <button
             onClick={() => setIsEvidenceOpen(true)}
             className="px-3.5 py-2 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold rounded-lg shadow-sm flex items-center space-x-1.5 transition-colors"
           >
             <Camera className="w-4 h-4" />
-            <span>Upload Evidence</span>
-          </button>
-
-          <button
-            onClick={() => setIsActionOpen(true)}
-            className="px-3 py-2 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-lg shadow-sm flex items-center space-x-1.5 transition-colors"
-          >
-            <FileEdit className="w-4 h-4" />
-            <span>Log Milestone</span>
+            <span>Resolve with Proof</span>
           </button>
 
           {isOverdue && (

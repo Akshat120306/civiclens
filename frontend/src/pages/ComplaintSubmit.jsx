@@ -35,41 +35,6 @@ export default function ComplaintSubmit() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Quick preset templates for rapid judge demo
-  const presets = [
-    {
-      label: '⚡ Demo Scenario A: Duplicate Road Complaint',
-      desc: 'Road has a huge pothole outside ABC College main gate creating traffic risk.',
-      loc: 'ABC College Main Gate, University Road',
-      type: 'Roads & Infrastructure',
-    },
-    {
-      label: '⚡ Demo Scenario B: Recurrence Test (Resolved Issue #1042)',
-      desc: 'Pothole has appeared again near ABC College after recent rains.',
-      loc: 'ABC College Main Gate, University Road',
-      type: 'Roads & Infrastructure',
-    },
-    {
-      label: '⚡ Demo Scenario C: Water Leakage Duplicate',
-      desc: 'Massive water leakage from broken pipe flooding Sector 9 Market.',
-      loc: 'Sector 9 Central Market, Gate 2',
-      type: 'Water Supply & Sanitation',
-    },
-    {
-      label: '⚡ Demo Scenario D: Brand New Streetlight Issue',
-      desc: 'Streetlight pole #42 sparking and dark at MG Road cross.',
-      loc: 'MG Road Junction',
-      type: 'Electricity & Lighting',
-    },
-  ];
-
-  const applyPreset = (p) => {
-    setDescription(p.desc);
-    setLocationName(p.loc);
-    setIssueType(p.type);
-    runAiPreCheck(p.desc, p.loc);
-  };
-
   const handleFileChange = (e) => {
     const selected = e.target.files[0];
     if (selected) {
@@ -161,27 +126,6 @@ export default function ComplaintSubmit() {
         </p>
       </div>
 
-      {/* Preset Buttons for Quick SIH Presentation */}
-      <div className="bg-slate-100/80 border border-slate-200 rounded-xl p-3.5 mb-6">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-2 flex items-center justify-between">
-          <span>⚡ 1-Click Demonstration Scenarios for Judges</span>
-          <span className="text-[10px] text-slate-500 font-normal">Click to pre-fill test data</span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {presets.map((p, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => applyPreset(p)}
-              className="text-left p-2.5 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 rounded-lg transition-all text-xs group"
-            >
-              <div className="font-bold text-slate-800 group-hover:text-blue-700">{p.label}</div>
-              <div className="text-[11px] text-slate-500 truncate mt-0.5 font-mono">"{p.desc}"</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Column: Complaint Submission Form */}
         <div className="lg:col-span-7 space-y-6">
@@ -207,18 +151,7 @@ export default function ComplaintSubmit() {
                 placeholder="Describe the civic issue in detail (e.g. Road has a huge pothole outside ABC College main gate creating traffic risk...)"
                 className="w-full text-xs sm:text-sm border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-600 focus:outline-none leading-relaxed"
               />
-              <div className="flex items-center justify-between mt-1">
-                <span className="text-[11px] text-slate-400">Be specific about landmarks and hazard level</span>
-                <button
-                  type="button"
-                  onClick={() => runAiPreCheck()}
-                  disabled={analyzing || !description.trim()}
-                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center space-x-1 disabled:opacity-40"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>{analyzing ? 'Analyzing...' : 'Run AI Analysis'}</span>
-                </button>
-              </div>
+              <span className="text-[11px] text-slate-400 mt-1 block">Be specific about landmarks and hazard level — the AI analyses it automatically.</span>
             </div>
 
             {/* Location */}
@@ -296,7 +229,7 @@ export default function ComplaintSubmit() {
                 className="w-full py-3 px-4 bg-[#0B2545] hover:bg-blue-900 text-white text-sm font-bold rounded-lg shadow-md transition-colors flex items-center justify-center space-x-2 disabled:opacity-50"
               >
                 <Send className="w-4 h-4" />
-                <span>{submitting ? 'Submitting & Clustering...' : 'Submit Grievance to Municipal Platform'}</span>
+                <span>{submitting ? 'Submitting...' : 'Submit Complaint'}</span>
               </button>
             </div>
           </form>
@@ -399,7 +332,7 @@ export default function ComplaintSubmit() {
             ) : (
               <div className="py-8 text-center text-slate-400 text-xs space-y-2">
                 <Info className="w-6 h-6 mx-auto text-slate-300" />
-                <p>Type a description above or click one of the preset scenarios to see live AI classification, similarity score, and duplicate detection.</p>
+                <p>Type a description above to see live AI classification, department routing, SLA, and duplicate detection.</p>
               </div>
             )}
           </div>

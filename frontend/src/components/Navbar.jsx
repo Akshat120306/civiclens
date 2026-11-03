@@ -109,29 +109,6 @@ export default function Navbar() {
               <span>Lodge Complaint</span>
             </Link>
 
-            <Link
-              to="/complaints"
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-1.5 ${
-                isActive('/complaints')
-                  ? 'bg-blue-700/80 text-white font-semibold shadow-inner'
-                  : 'text-slate-200 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              <FileText className="w-4 h-4 text-indigo-300" />
-              <span>Complaints Ledger</span>
-            </Link>
-
-            <Link
-              to="/department"
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-1.5 ${
-                isActive('/department')
-                  ? 'bg-blue-700/80 text-white font-semibold shadow-inner'
-                  : 'text-slate-200 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4 text-rose-300" />
-              <span>Dept Command</span>
-            </Link>
           </nav>
 
           {/* User / Quick Switcher */}
