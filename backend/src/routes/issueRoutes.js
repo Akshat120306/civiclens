@@ -4,6 +4,7 @@ import { upload } from '../middleware/upload.js';
 import { authenticate, optionalAuth } from '../middleware/auth.js';
 import { calculateResolutionQualityScore } from '../services/resolutionScoreService.js';
 import { findSimilarIssues } from '../services/similarityEngine.js';
+import { reviewJustification, reviewResolutionEvidence } from '../services/adjudicationService.js';
 
 const router = express.Router();
 
@@ -151,6 +152,15 @@ router.get('/:id', optionalAuth, async (req, res) => {
       ORDER BY r.created_at DESC
     `, [id]);
 
+    // 6b. Fetch accountability justifications
+    const justificationsRes = await query(`
+      SELECT j.*, u.name as officer_name
+      FROM justifications j
+      LEFT JOIN users u ON j.submitted_by = u.id
+      WHERE j.issue_id = $1
+      ORDER BY j.created_at DESC
+    `, [id]);
+
     // 7. Calculate dynamic AI Resolution Quality Score
     const qualityScore = calculateResolutionQualityScore({
       slaDeadline: issue.sla_deadline,
@@ -193,6 +203,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
       evidence: evidenceRes.rows,
       verifications: verificationsRes.rows,
       recurrenceEvents: recurrenceRes.rows,
+      justifications: justificationsRes.rows,
       qualityScore,
     });
   } catch (err) {
@@ -324,27 +335,55 @@ router.post('/:id/evidence', optionalAuth, upload.single('file'), async (req, re
       RETURNING id, created_at
     `, [id, actionId, fileUrl, description || 'Field resolution photographic proof', userId]);
 
-    // 3. Mark issue as Resolved if selected
+    // 3. Mark issue as Resolved if selected — AI adjudicates the evidence first.
+    let aiVerdict = null;
     if (mark_resolved === 'true' || mark_resolved === true) {
+      // Count all evidence now on file for this issue.
+      const evCountRes = await query('SELECT COUNT(*) as count FROM evidence WHERE issue_id = $1', [id]);
+      const evidenceCount = Number(evCountRes.rows[0]?.count || 1);
+      const issueCtxRes = await query('SELECT title FROM issues WHERE id = $1', [id]);
+      const issueCtx = issueCtxRes.rows[0]?.title || '';
+
+      aiVerdict = await reviewResolutionEvidence(description || '', evidenceCount, issueCtx);
+      const approved = aiVerdict.verdict === 'APPROVED';
+
       await query(`
         UPDATE issues
-        SET status = 'Resolved',
+        SET status = $1,
             verification_status = 'Pending',
-            resolution_summary = $1,
+            resolution_summary = $2,
+            ai_resolution_verdict = $3,
+            ai_resolution_notes = $4,
+            is_escalated = CASE WHEN $5 = 1 THEN 0 ELSE is_escalated END,
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = $2
-      `, [description || 'Resolution evidence submitted by municipal team.', id]);
+        WHERE id = $6
+      `, [
+        approved ? 'Resolved' : 'In Progress',
+        description || 'Resolution evidence submitted by municipal team.',
+        aiVerdict.verdict,
+        aiVerdict.notes,
+        approved ? 1 : 0,
+        id,
+      ]);
 
       await query(`
         INSERT INTO actions (issue_id, user_id, action_type, description)
         VALUES ($1, $2, $3, $4)
-      `, [id, userId, 'STATUS_UPDATE', 'Issue marked as RESOLVED pending citizen verification audit.']);
+      `, [
+        id,
+        userId,
+        'AI_RESOLUTION_REVIEW',
+        approved
+          ? `AI reviewed resolution evidence and APPROVED the fix (${Math.round(aiVerdict.confidence * 100)}% confidence). ${aiVerdict.notes} Awaiting citizen audit.`
+          : `AI reviewed resolution evidence and found it INSUFFICIENT. ${aiVerdict.notes} Issue remains open.`,
+      ]);
     }
 
     return res.status(201).json({
       message: 'Resolution evidence uploaded successfully.',
       evidenceId: evRes.rows[0]?.id,
       fileUrl,
+      aiVerdict,
     });
   } catch (err) {
     console.error('Evidence upload error:', err);
@@ -405,6 +444,72 @@ router.post('/:id/verification', optionalAuth, async (req, res) => {
   } catch (err) {
     console.error('Verification error:', err);
     return res.status(500).json({ error: 'Failed to submit verification.' });
+  }
+});
+
+// POST /api/issues/:id/justification
+// A department explains why an overdue issue isn't resolved. AI reviews it.
+router.post('/:id/justification', optionalAuth, upload.single('file'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const userId = req.user ? req.user.id : 2;
+
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'A reason is required to justify the SLA breach.' });
+    }
+
+    const evidenceUrl = req.file ? `/uploads/${req.file.filename}` : (req.body.evidence_url || null);
+    const hasEvidence = Boolean(evidenceUrl);
+
+    const issueRes = await query('SELECT title FROM issues WHERE id = $1', [id]);
+    if (!issueRes.rows.length) return res.status(404).json({ error: 'Issue not found.' });
+    const issueCtx = issueRes.rows[0].title;
+
+    // AI adjudicates the justification.
+    const review = await reviewJustification(reason, hasEvidence, issueCtx);
+
+    const jRes = await query(`
+      INSERT INTO justifications (issue_id, submitted_by, reason, evidence_url, ai_verdict, ai_reasoning, ai_confidence)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING id, created_at
+    `, [id, userId, reason, evidenceUrl, review.verdict, review.reasoning, review.confidence]);
+
+    // Accepted -> clear escalation; otherwise keep it on the Accountability Wall.
+    const accepted = review.verdict === 'ACCEPTED';
+    await query(`
+      UPDATE issues
+      SET is_escalated = $1,
+          escalation_reason = $2,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = $3
+    `, [
+      accepted ? 0 : 1,
+      accepted
+        ? null
+        : `AI ${review.verdict === 'REJECTED' ? 'rejected' : 'found insufficient'} the department's justification. ${review.reasoning}`,
+      id,
+    ]);
+
+    await query(`
+      INSERT INTO actions (issue_id, user_id, action_type, description)
+      VALUES ($1, $2, $3, $4)
+    `, [
+      id,
+      userId,
+      'ACCOUNTABILITY_JUSTIFICATION',
+      `Department filed an SLA-breach justification. AI verdict: ${review.verdict} (${Math.round(review.confidence * 100)}%). ${review.reasoning}`,
+    ]);
+
+    return res.status(201).json({
+      message: 'Justification submitted and reviewed by AI.',
+      justificationId: jRes.rows[0]?.id,
+      review,
+      escalated: !accepted,
+    });
+  } catch (err) {
+    console.error('Justification error:', err);
+    return res.status(500).json({ error: 'Failed to submit justification.' });
   }
 });
 

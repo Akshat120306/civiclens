@@ -29,6 +29,8 @@ import RecurrenceBanner from '../components/RecurrenceBanner';
 import VerificationModal from '../components/VerificationModal';
 import EvidenceModal from '../components/EvidenceModal';
 import ActionModal from '../components/ActionModal';
+import JustificationModal from '../components/JustificationModal';
+import { Gavel } from 'lucide-react';
 import { formatDistanceToNow, parseISO, format } from 'date-fns';
 
 export default function IssuePassport() {
@@ -44,6 +46,7 @@ export default function IssuePassport() {
   const [isVerificationOpen, setIsVerificationOpen] = useState(false);
   const [isEvidenceOpen, setIsEvidenceOpen] = useState(false);
   const [isActionOpen, setIsActionOpen] = useState(false);
+  const [isJustifyOpen, setIsJustifyOpen] = useState(false);
 
   const fetchPassport = async () => {
     try {
@@ -82,7 +85,8 @@ export default function IssuePassport() {
     );
   }
 
-  const { issue, complaints = [], actions = [], evidence = [], verifications = [], recurrenceEvents = [], qualityScore } = passportData;
+  const { issue, complaints = [], actions = [], evidence = [], verifications = [], recurrenceEvents = [], justifications = [], qualityScore } = passportData;
+  const isOverdue = issue.slaStatus === 'OVERDUE';
 
   const isOfficerOrAdmin = user?.role === 'officer' || user?.role === 'admin';
 
@@ -122,6 +126,16 @@ export default function IssuePassport() {
             <FileEdit className="w-4 h-4" />
             <span>Log Milestone</span>
           </button>
+
+          {isOverdue && (
+            <button
+              onClick={() => setIsJustifyOpen(true)}
+              className="px-3.5 py-2 bg-orange-700 hover:bg-orange-800 text-white text-xs font-bold rounded-lg shadow-sm flex items-center space-x-1.5 transition-colors"
+            >
+              <Gavel className="w-4 h-4" />
+              <span>Explain Breach</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -133,6 +147,63 @@ export default function IssuePassport() {
           triggerDescription={recurrenceEvents[0]?.trigger_description}
           notes={recurrenceEvents[0]?.notes}
         />
+      )}
+
+      {/* Accountability: overdue banner + AI resolution verdict + justification log */}
+      {(isOverdue || justifications.length > 0 || issue.ai_resolution_verdict) && (
+        <div className="bg-white rounded-xl border border-orange-200 shadow-sm p-5 space-y-4">
+          <div className="flex items-center space-x-2 border-b border-slate-100 pb-2">
+            <Gavel className="w-5 h-5 text-orange-700" />
+            <h3 className="font-bold text-base text-slate-900">Accountability</h3>
+          </div>
+
+          {isOverdue && (
+            <div className="bg-orange-50 border border-orange-300 rounded-lg p-3 text-xs text-orange-900">
+              <p className="font-bold">SLA breached — public accountability active.</p>
+              <p className="mt-0.5">
+                {justifications.some(j => j.ai_verdict === 'ACCEPTED')
+                  ? 'An accepted justification is on record. Work is tracked publicly until resolved.'
+                  : 'The responsible department must explain the delay with evidence, or this issue stays on the public Accountability Wall.'}
+              </p>
+            </div>
+          )}
+
+          {issue.ai_resolution_verdict && (
+            <div className={`rounded-lg p-3 text-xs border ${
+              issue.ai_resolution_verdict === 'APPROVED'
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                : 'bg-rose-50 border-rose-300 text-rose-900'
+            }`}>
+              <p className="font-bold">AI Resolution Review: {issue.ai_resolution_verdict}</p>
+              <p className="mt-0.5">{issue.ai_resolution_notes}</p>
+            </div>
+          )}
+
+          {justifications.length > 0 && (
+            <div className="space-y-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Breach Justifications</span>
+              {justifications.map((j) => (
+                <div key={j.id} className="border border-slate-200 rounded-lg p-3 text-xs space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-800">{j.officer_name || 'Department'}</span>
+                    <span className={`font-bold px-2 py-0.5 rounded ${
+                      j.ai_verdict === 'ACCEPTED' ? 'bg-emerald-100 text-emerald-800'
+                      : j.ai_verdict === 'REJECTED' ? 'bg-rose-100 text-rose-800'
+                      : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      AI: {(j.ai_verdict || '').replace('_', ' ')}
+                    </span>
+                  </div>
+                  <p className="text-slate-700"><strong>Reason:</strong> {j.reason}</p>
+                  <p className="text-slate-500 italic">{j.ai_reasoning}</p>
+                  {j.evidence_url && (
+                    <a href={j.evidence_url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-semibold">View attached proof</a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Main Passport Header Card */}
@@ -410,6 +481,13 @@ export default function IssuePassport() {
         issueId={issue.id}
         isOpen={isActionOpen}
         onClose={() => setIsActionOpen(false)}
+        onSuccess={fetchPassport}
+      />
+
+      <JustificationModal
+        issueId={issue.id}
+        isOpen={isJustifyOpen}
+        onClose={() => setIsJustifyOpen(false)}
         onSuccess={fetchPassport}
       />
     </div>

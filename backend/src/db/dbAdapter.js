@@ -62,6 +62,8 @@ export async function initDb() {
 }
 
 async function autoSeedIfEmpty() {
+  // Skip when we are already inside an explicit seed run (prevents recursion/deadlock).
+  if (process.env.CIVICLENS_SEEDING === '1') return;
   try {
     const check = await query('SELECT COUNT(*) as count FROM users');
     const count = Number(check.rows[0]?.count || check.rows[0]?.COUNT || 0);

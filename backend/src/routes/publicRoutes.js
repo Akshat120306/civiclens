@@ -105,6 +105,67 @@ router.get('/issues', async (req, res) => {
   }
 });
 
+// GET /api/public/headlines (Public Accountability Wall)
+// Overdue issues with no accepted justification, kept on top until fixed.
+router.get('/headlines', async (req, res) => {
+  try {
+    const now = new Date();
+
+    // Auto-escalate: any overdue, unresolved issue without an ACCEPTED justification.
+    const candidatesRes = await query(`
+      SELECT i.id, i.sla_deadline, i.status,
+             (SELECT COUNT(*) FROM justifications j WHERE j.issue_id = i.id AND j.ai_verdict = 'ACCEPTED') as accepted_count
+      FROM issues i
+    `);
+    for (const c of candidatesRes.rows) {
+      const done = ['Resolved', 'Closed', 'Verified'].includes(c.status);
+      const overdue = c.sla_deadline && new Date(c.sla_deadline) < now;
+      if (!done && overdue && Number(c.accepted_count) === 0) {
+        await query(`
+          UPDATE issues SET is_escalated = 1,
+            escalation_reason = COALESCE(escalation_reason, 'SLA breached with no accepted justification. Held publicly accountable until resolved.')
+          WHERE id = $1 AND is_escalated = 0
+        `, [c.id]);
+      } else if (done) {
+        await query('UPDATE issues SET is_escalated = 0 WHERE id = $1 AND is_escalated = 1', [c.id]);
+      }
+    }
+
+    const result = await query(`
+      SELECT i.id, i.title, i.issue_type, i.location_name, i.severity, i.status,
+             i.sla_deadline, i.escalation_reason, i.recurrence_count, i.is_recurrent,
+             d.name as department_name, d.code as department_code,
+             COUNT(DISTINCT c.id) as complaint_count,
+             (SELECT COUNT(*) FROM justifications j WHERE j.issue_id = i.id) as justification_count
+      FROM issues i
+      LEFT JOIN departments d ON i.department_id = d.id
+      LEFT JOIN complaints c ON c.issue_id = i.id
+      WHERE i.is_escalated = 1
+      GROUP BY i.id
+    `);
+
+    const headlines = result.rows.map((issue) => {
+      const deadline = issue.sla_deadline ? new Date(issue.sla_deadline) : null;
+      const hoursOverdue = deadline ? Math.max(0, Math.round((now - deadline) / (1000 * 60 * 60))) : 0;
+      return {
+        ...issue,
+        complaint_count: Number(issue.complaint_count || 1),
+        justification_count: Number(issue.justification_count || 0),
+        hoursOverdue,
+        is_recurrent: issue.is_recurrent === 1 || issue.recurrence_count > 0,
+      };
+    });
+
+    // Most overdue first.
+    headlines.sort((a, b) => b.hoursOverdue - a.hoursOverdue);
+
+    return res.json({ headlines });
+  } catch (err) {
+    console.error('Headlines fetch error:', err);
+    return res.status(500).json({ error: 'Failed to fetch accountability headlines.' });
+  }
+});
+
 // GET /api/public/stats
 router.get('/stats', async (req, res) => {
   try {

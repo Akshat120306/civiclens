@@ -3,9 +3,11 @@ import { initDb, query } from './dbAdapter.js';
 
 async function seed() {
   console.log('Starting CivicLens database seed...');
+  process.env.CIVICLENS_SEEDING = '1';
   await initDb();
 
   // Clear existing records to ensure clean state
+  await query('DELETE FROM justifications');
   await query('DELETE FROM recurrence_events');
   await query('DELETE FROM verifications');
   await query('DELETE FROM evidence');
@@ -243,6 +245,31 @@ async function seed() {
       'Submitted',
     ]);
   }
+
+  // Accountability demo for overdue #1044: department filed a weak excuse, AI rejected it,
+  // so the issue is escalated to the public Accountability Wall.
+  await query(`
+    UPDATE issues
+    SET is_escalated = 1,
+        escalation_reason = 'AI rejected the department''s justification (no evidence). Held publicly accountable until resolved.'
+    WHERE id = 1044
+  `);
+
+  await query(`
+    INSERT INTO justifications (id, issue_id, submitted_by, reason, evidence_url, ai_verdict, ai_reasoning, ai_confidence)
+    VALUES (1, 1044, 4, $1, $2, $3, $4, $5)
+  `, [
+    'We will look into the streetlight issue soon, our team is busy with other work right now.',
+    null,
+    'REJECTED',
+    'No supporting evidence was attached and the explanation is non-committal. An overdue critical safety issue cannot be justified by a written statement alone. Issue remains on the public Accountability Wall.',
+    0.9,
+  ]);
+
+  await query(`
+    INSERT INTO actions (id, issue_id, user_id, action_type, description)
+    VALUES (6, 1044, 4, 'ACCOUNTABILITY_JUSTIFICATION', 'Department filed an SLA-breach justification. AI verdict: REJECTED (90%). No evidence provided for an overdue critical safety issue.')
+  `);
 
   // 6. Seed Waste Management Issue #1045
   const swmDeadline = new Date(Date.now() + 18 * 3600 * 1000).toISOString();

@@ -53,6 +53,9 @@ export const issuesApi = {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
   submitVerification: (id, data) => api.post(`/issues/${id}/verification`, data),
+  submitJustification: (id, formData) => api.post(`/issues/${id}/justification`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 };
 
 export const dashboardApi = {
@@ -62,6 +65,7 @@ export const dashboardApi = {
 export const publicApi = {
   getIssues: (params) => api.get('/public/issues', { params }),
   getStats: () => api.get('/public/stats'),
+  getHeadlines: () => api.get('/public/headlines'),
 };
 
 export default api;

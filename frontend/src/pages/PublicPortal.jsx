@@ -14,7 +14,8 @@ import {
   Users,
   BarChart3,
   TrendingUp,
-  FileText
+  FileText,
+  Megaphone
 } from 'lucide-react';
 import StatusBadge from '../components/StatusBadge';
 import SeverityBadge from '../components/SeverityBadge';
@@ -23,6 +24,7 @@ import { formatDistanceToNow, parseISO } from 'date-fns';
 export default function PublicPortal() {
   const [issues, setIssues] = useState([]);
   const [stats, setStats] = useState(null);
+  const [headlines, setHeadlines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedDept, setSelectedDept] = useState('');
@@ -31,16 +33,18 @@ export default function PublicPortal() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [issuesRes, statsRes] = await Promise.all([
+      const [issuesRes, statsRes, headlinesRes] = await Promise.all([
         publicApi.getIssues({
           department_code: selectedDept || undefined,
           status: selectedStatus || undefined,
           search: search.trim() || undefined,
         }),
         publicApi.getStats(),
+        publicApi.getHeadlines(),
       ]);
       setIssues(issuesRes.data.issues || []);
       setStats(statsRes.data || null);
+      setHeadlines(headlinesRes.data.headlines || []);
     } catch (err) {
       console.error('Failed to fetch public portal data', err);
     } finally {
@@ -88,6 +92,50 @@ export default function PublicPortal() {
           </div>
         </div>
       </div>
+
+      {/* Accountability Wall — overdue issues with no accepted justification, pinned on top */}
+      {headlines.length > 0 && (
+        <div className="bg-white rounded-2xl border-2 border-rose-300 shadow-sm overflow-hidden">
+          <div className="bg-rose-700 text-white px-5 py-3 flex items-center space-x-2">
+            <Megaphone className="w-5 h-5" />
+            <h2 className="font-black text-sm sm:text-base tracking-tight">ACCOUNTABILITY WALL — Overdue & Unanswered</h2>
+            <span className="ml-auto text-xs font-bold bg-white/20 px-2 py-0.5 rounded">{headlines.length} issue(s)</span>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {headlines.map((h) => (
+              <Link
+                key={h.id}
+                to={`/issues/${h.id}`}
+                className="block px-5 py-4 hover:bg-rose-50/50 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-xs font-black text-rose-700">#{h.id}</span>
+                      <SeverityBadge severity={h.severity} />
+                      {h.is_recurrent && (
+                        <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded">RECURRING</span>
+                      )}
+                    </div>
+                    <h3 className="font-bold text-sm text-slate-900">{h.title}</h3>
+                    <p className="text-xs text-slate-500">{h.department_name} • {h.location_name} • {h.complaint_count} citizen report(s)</p>
+                    {h.escalation_reason && (
+                      <p className="text-[11px] text-rose-700 font-medium">{h.escalation_reason}</p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-2xl font-black text-rose-700">{h.hoursOverdue}h</div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Overdue</div>
+                    <div className="text-[10px] text-slate-500 mt-1">
+                      {h.justification_count > 0 ? `${h.justification_count} rejected excuse(s)` : 'No justification filed'}
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* KPI Stats Grid */}
       {stats && (

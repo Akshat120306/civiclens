@@ -41,6 +41,10 @@ CREATE TABLE IF NOT EXISTS issues (
   recurrence_count INTEGER DEFAULT 0,
   is_recurrent INTEGER DEFAULT 0, -- 0 for false, 1 for true
   root_cause TEXT,
+  is_escalated INTEGER DEFAULT 0, -- 1 = overdue with no / rejected justification -> public headline
+  escalation_reason TEXT,         -- why it is on the Accountability Wall
+  ai_resolution_verdict VARCHAR(50), -- AI call on resolution evidence: 'APPROVED', 'INSUFFICIENT'
+  ai_resolution_notes TEXT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -96,5 +100,20 @@ CREATE TABLE IF NOT EXISTS recurrence_events (
   trigger_complaint_id INTEGER REFERENCES complaints(id),
   similarity_score REAL,
   notes TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Accountability: when an issue breaches its SLA, the responsible department
+-- must file a justification (reason + evidence). The AI reviews it and the
+-- resolution evidence, and decides whether the excuse / fix is acceptable.
+CREATE TABLE IF NOT EXISTS justifications (
+  id INTEGER PRIMARY KEY,
+  issue_id INTEGER NOT NULL REFERENCES issues(id),
+  submitted_by INTEGER REFERENCES users(id),
+  reason TEXT NOT NULL,            -- why the issue is still not resolved
+  evidence_url VARCHAR(500),       -- proof backing the reason
+  ai_verdict VARCHAR(50),          -- 'ACCEPTED', 'REJECTED', 'NEEDS_MORE'
+  ai_reasoning TEXT,               -- AI explanation of the verdict
+  ai_confidence REAL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
